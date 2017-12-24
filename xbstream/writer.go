@@ -56,7 +56,7 @@ func (f *File) Write(p []byte) (int, error) {
 		return 0, err
 	}
 
-	return len(p), f.writeChunk(p)
+	return len(p), f.writeChunk(p[:f.pos])
 }
 
 func (f *File) writeChunk(p []byte) error {
@@ -83,7 +83,7 @@ func (f *File) writeChunk(p []byte) error {
 
 	// path
 	n = copy(buffer[pos:], f.path)
-	pos += len(f.path)
+	pos += n
 
 	// Payload Length
 	n = copy(buffer[pos:], int8store(len(p)))
@@ -102,7 +102,7 @@ func (f *File) writeChunk(p []byte) error {
 	n = copy(buffer[pos:], int4store(int(checksum)))
 	pos += n
 
-	_, err := io.Copy(f.writer.writer, bytes.NewReader(buffer))
+	_, err := io.CopyN(f.writer.writer, bytes.NewReader(buffer), int64(pos))
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func (f *File) writeEOF() error {
 	n = copy(buffer[pos:], f.path)
 	pos += len(f.path)
 
-	_, err := io.Copy(f.writer.writer, bytes.NewReader(buffer))
+	_, err := io.CopyN(f.writer.writer, bytes.NewReader(buffer), int64(pos))
 	if err != nil {
 		return err
 	}
@@ -159,7 +159,7 @@ func (f *File) Flush() error {
 		return nil
 	}
 
-	if err := f.writeChunk(f.chunk); err != nil {
+	if err := f.writeChunk(f.chunk[:f.pos]); err != nil {
 		return err
 	}
 
