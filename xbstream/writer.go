@@ -56,17 +56,16 @@ func (f *File) Write(p []byte) (int, error) {
 		return 0, err
 	}
 
-	return len(p), f.writeChunk(p[:f.pos])
+	return len(p), f.writeChunk(p)
 }
 
 func (f *File) writeChunk(p []byte) error {
-	magic := []byte(ChunkMagic)
-	buffer := make([]byte, len(magic)-1+1+1+4+MaxPathLength+8+8+4)
+	buffer := make([]byte, len(chunkMagic)-1+1+1+4+MaxPathLength+8+8+4)
 	pos := 0
 	n := 0
 
 	// Chunk Magic
-	n = copy(buffer[pos:], magic)
+	n = copy(buffer[pos:], chunkMagic)
 	pos += n
 
 	// Chunk Flags
@@ -74,8 +73,8 @@ func (f *File) writeChunk(p []byte) error {
 	pos++
 
 	// Chunk Type
-	n = copy(buffer[pos:], []byte(ChunkTypePayload))
-	pos += n
+	buffer[pos] = chunkTypePayload
+	pos++
 
 	// path Length
 	n = copy(buffer[pos:], int4store(len(f.path)))
@@ -118,8 +117,7 @@ func (f *File) writeChunk(p []byte) error {
 }
 
 func (f *File) writeEOF() error {
-	magic := []byte(ChunkMagic)
-	buffer := make([]byte, len(magic)-1+1+1+4+MaxPathLength)
+	buffer := make([]byte, len(chunkMagic)-1+1+1+4+MaxPathLength)
 	pos := 0
 	n := 0
 
@@ -127,16 +125,16 @@ func (f *File) writeEOF() error {
 	defer f.writer.mutex.Unlock()
 
 	// Chunk Magic
-	n = copy(buffer[pos:], magic)
+	n = copy(buffer[pos:], chunkMagic)
 	pos += n
 
 	// Chunk Flags
 	buffer[pos] = 0
-	pos += 1
+	pos++
 
 	// Chunk Type
-	n = copy(buffer[pos:], []byte(ChunkTypeEOF))
-	pos += n
+	buffer[pos] = chunkTypeEOF
+	pos++
 
 	// path Length
 	n = copy(buffer[pos:], int4store(len(f.path)))

@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"sync"
 )
 
 func init() {
@@ -16,40 +17,46 @@ func main() {
 
 	b := make([]byte, xbstream.MinimumChunkSize)
 
-	for _, f := range os.Args[1:] {
-		if file, err := os.Open(f); err == nil {
-			fw, err := w.Create(f)
-			if err != nil {
-				continue
-			}
+	wg := sync.WaitGroup{}
 
-			for {
-				n, err := file.Read(b)
-				log.Println(n)
+	for _, f := range os.Args[1:] {
+		wg.Add(1)
+		go func(path string) {
+			defer wg.Done()
+			if file, err := os.Open(path); err == nil {
+				fw, err := w.Create(path)
 				if err != nil {
-					if err == io.EOF {
+					log.Fatal(err)
+				}
+
+				for {
+					n, err := file.Read(b)
+					if err != nil {
+						if err == io.EOF {
+							break
+						}
+						log.Fatal(err)
+					}
+					if _, err := fw.Write(b[:n]); err != nil {
+						log.Fatal(err)
 						break
 					}
-					log.Fatal(err)
-					break
 				}
-				if _, err := fw.Write(b[:n]); err != nil {
-					log.Println(err)
-					break
-				}
-			}
 
-			err = fw.Close()
-			if err != nil {
-				log.Println(err)
+				err = fw.Close()
+				if err != nil {
+					log.Fatal(err)
+				}
+			} else {
+				log.Printf("unable to open file %s", file)
 			}
-		} else {
-			log.Printf("unable to open file %s", file)
-		}
+		}(f)
 	}
+
+	wg.Wait()
 
 	err := w.Close()
 	if err != nil {
-		log.Println(err)
+		log.Fatal(err)
 	}
 }
