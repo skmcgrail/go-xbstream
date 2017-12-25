@@ -15,14 +15,15 @@ func init() {
 func main() {
 	w := xbstream.NewWriter(os.Stdout)
 
-	b := make([]byte, xbstream.MinimumChunkSize)
-
 	wg := sync.WaitGroup{}
 
 	for _, f := range os.Args[1:] {
 		wg.Add(1)
 		go func(path string) {
 			defer wg.Done()
+
+			b := make([]byte, xbstream.MinimumChunkSize)
+
 			if file, err := os.Open(path); err == nil {
 				fw, err := w.Create(path)
 				if err != nil {
