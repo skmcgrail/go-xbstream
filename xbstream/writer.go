@@ -2,6 +2,7 @@ package xbstream
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"hash/crc32"
 	"io"
@@ -60,54 +61,69 @@ func (f *File) Write(p []byte) (int, error) {
 }
 
 func (f *File) writeChunk(p []byte) error {
-	buffer := make([]byte, len(chunkMagic)-1+1+1+4+MaxPathLength+8+8+4)
-	pos := 0
-	n := 0
+	var err error
+	buffer := new(bytes.Buffer)
+	chunk := new(Chunk)
 
 	// Chunk Magic
-	n = copy(buffer[pos:], chunkMagic)
-	pos += n
+	chunk.Magic = make([]uint8, len(chunkMagic))
+	copy(chunk.Magic, chunkMagic)
+	if err = binary.Write(buffer, binary.BigEndian, &chunk.Magic); err != nil {
+		return err
+	}
 
 	// Chunk Flags
-	buffer[pos] = 0
-	pos++
+	chunk.Flags = 0
+	if err = binary.Write(buffer, binary.LittleEndian, &chunk.Flags); err != nil {
+		return err
+	}
 
 	// Chunk Type
-	buffer[pos] = chunkTypePayload
-	pos++
+	chunk.Type = ChunkTypePayload
+	if err = binary.Write(buffer, binary.LittleEndian, &chunk.Type); err != nil {
+		return err
+	}
 
 	// path Length
-	n = copy(buffer[pos:], int4store(len(f.path)))
-	pos += n
+	chunk.PathLen = uint32(len(f.path))
+	if err = binary.Write(buffer, binary.LittleEndian, &chunk.PathLen); err != nil {
+		return err
+	}
 
 	// path
-	n = copy(buffer[pos:], f.path)
-	pos += n
+	chunk.Path = f.path
+	if err = binary.Write(buffer, binary.BigEndian, &chunk.Path); err != nil {
+		return err
+	}
 
 	// Payload Length
-	n = copy(buffer[pos:], int8store(len(p)))
-	pos += n
+	chunk.PayLen = uint64(len(p))
+	if _, err = buffer.Write(int8store(chunk.PayLen)); err != nil {
+		return err
+	}
 
 	// Checksum
-	checksum := crc32.ChecksumIEEE(p)
+	chunk.Checksum = crc32.ChecksumIEEE(p)
 
 	f.writer.mutex.Lock()
 	defer f.writer.mutex.Unlock()
 
 	// Payload Offset
-	n = copy(buffer[pos:], int8store(f.offset))
-	pos += n
-
-	n = copy(buffer[pos:], int4store(int(checksum)))
-	pos += n
-
-	_, err := io.CopyN(f.writer.writer, bytes.NewReader(buffer), int64(pos))
-	if err != nil {
+	chunk.PayOffset = uint64(f.offset)
+	if _, err = buffer.Write(int8store(chunk.PayOffset)); err != nil {
 		return err
 	}
 
-	_, err = io.Copy(f.writer.writer, bytes.NewReader(p))
-	if err != nil {
+	// Checksum
+	if err = binary.Write(buffer, binary.LittleEndian, &chunk.Checksum); err != nil {
+		return err
+	}
+
+	if _, err = io.Copy(f.writer.writer, buffer); err != nil {
+		return nil
+	}
+
+	if _, err = io.Copy(f.writer.writer, bytes.NewReader(p)); err != nil {
 		return err
 	}
 
@@ -117,35 +133,45 @@ func (f *File) writeChunk(p []byte) error {
 }
 
 func (f *File) writeEOF() error {
-	buffer := make([]byte, len(chunkMagic)-1+1+1+4+MaxPathLength)
-	pos := 0
-	n := 0
+	var err error
+	buffer := new(bytes.Buffer)
+	chunk := new(Chunk)
 
 	f.writer.mutex.Lock()
 	defer f.writer.mutex.Unlock()
 
 	// Chunk Magic
-	n = copy(buffer[pos:], chunkMagic)
-	pos += n
+	chunk.Magic = make([]uint8, len(chunkMagic))
+	copy(chunk.Magic, chunkMagic)
+	if err = binary.Write(buffer, binary.BigEndian, &chunk.Magic); err != nil {
+		return err
+	}
 
 	// Chunk Flags
-	buffer[pos] = 0
-	pos++
+	chunk.Flags = 0
+	if err = binary.Write(buffer, binary.LittleEndian, &chunk.Flags); err != nil {
+		return err
+	}
 
 	// Chunk Type
-	buffer[pos] = chunkTypeEOF
-	pos++
+	chunk.Type = ChunkTypeEOF
+	if err = binary.Write(buffer, binary.LittleEndian, &chunk.Type); err != nil {
+		return err
+	}
 
 	// path Length
-	n = copy(buffer[pos:], int4store(len(f.path)))
-	pos += n
+	chunk.PathLen = uint32(len(f.path))
+	if err = binary.Write(buffer, binary.LittleEndian, &chunk.PathLen); err != nil {
+		return err
+	}
 
 	// path
-	n = copy(buffer[pos:], f.path)
-	pos += len(f.path)
+	chunk.Path = f.path
+	if err = binary.Write(buffer, binary.BigEndian, &chunk.Path); err != nil {
+		return err
+	}
 
-	_, err := io.CopyN(f.writer.writer, bytes.NewReader(buffer), int64(pos))
-	if err != nil {
+	if _, err = io.Copy(f.writer.writer, buffer); err != nil {
 		return err
 	}
 

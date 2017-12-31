@@ -2,22 +2,14 @@ package xbstream
 
 import (
 	"bytes"
-	"fmt"
+	"encoding/binary"
+	"errors"
 	"io"
 )
 
 type Reader struct {
 	reader io.Reader
-	offset int
-}
-
-type Chunk struct {
-	Type     int
-	Path     string
-	Offset   int
-	Data     []byte
-	flags    byte
-	checksum int
+	offset int64
 }
 
 func NewReader(reader io.Reader) *Reader {
@@ -25,47 +17,95 @@ func NewReader(reader io.Reader) *Reader {
 }
 
 func (r *Reader) Next() (*Chunk, error) {
-	chunk := &Chunk{}
+	var (
+		chunk = new(Chunk)
+		err   error
+	)
 
-	buffer := make([]byte, chunkHeaderLength)
-	pos := 0
+	chunk.Magic = make([]uint8, len(chunkMagic))
 
-	n, err := r.reader.Read(buffer)
-	if err != nil {
-		return nil, err
-	} else if n < chunkHeaderLength {
-		return nil, fmt.Errorf("unexpected end of stream at offset %#x", r.offset)
+	// Chunk Magic
+	if err = binary.Read(r.reader, binary.BigEndian, &chunk.Magic); err != nil {
+		return nil, StreamReadError
 	}
 
-	// Chunk magic
-	if bytes.Compare(buffer[pos:len(chunkMagic)], chunkMagic) != -1 {
-		return nil, fmt.Errorf("wrong chunk magic at offset %#x", r.offset)
+	if bytes.Compare(chunk.Magic, chunkMagic) != 0 {
+		return nil, errors.New("wrong chunk magic")
 	}
-	pos += len(chunkMagic)
-	r.offset += len(chunkMagic)
 
-	// Chunk flags
-	chunk.flags = buffer[pos]
-	pos++
-	r.offset++
+	offset := int64(8)
 
-	// Chunk Type and ignore unknown types if flag was set
-	chunk.Type = validateChunkType(buffer[pos])
-	if chunk.Type == ChunkTypeUnknown && !(chunk.flags&FlagChunkIgnorable == 1) {
-		return nil, fmt.Errorf("unknown chunk type %#x at offset %#x", buffer[pos], r.offset)
+	// Chunk Flags
+	if err = binary.Read(r.reader, binary.LittleEndian, &chunk.Flags); err != nil {
+		return nil, StreamReadError
 	}
-	pos++
-	r.offset++
+	offset++
 
-	return nil, nil
+	// Chunk Type
+	if err = binary.Read(r.reader, binary.LittleEndian, &chunk.Type); err != nil {
+		return nil, StreamReadError
+	}
+	if chunkType := validateChunkType(chunk.Type); chunkType == ChunkTypeUnknown {
+		if !(chunk.Flags&FlagChunkIgnorable == 1) {
+			return nil, errors.New("unknown chunk type")
+		}
+	}
+	offset++
+
+	// Path Length
+	if err = binary.Read(r.reader, binary.LittleEndian, &chunk.PathLen); err != nil {
+		return nil, StreamReadError
+	}
+	offset += 4
+
+	// Path
+	if chunk.PathLen > 0 {
+		chunk.Path = make([]uint8, chunk.PathLen)
+		if err = binary.Read(r.reader, binary.BigEndian, &chunk.Path); err != nil {
+			return nil, StreamReadError
+		}
+		offset += int64(chunk.PathLen)
+	}
+
+	if chunk.Type == ChunkTypeEOF {
+		return chunk, nil
+	}
+
+	payLen := make([]byte, 8)
+	if _, err := r.reader.Read(payLen); err != nil {
+		return nil, StreamReadError
+	}
+	chunk.PayLen = uint8korr(payLen)
+	offset += 8
+
+	if err = binary.Read(r.reader, binary.LittleEndian, &chunk.PayOffset); err != nil {
+		return nil, StreamReadError
+	}
+	offset += 8
+
+	if err = binary.Read(r.reader, binary.LittleEndian, &chunk.Checksum); err != nil {
+		return nil, StreamReadError
+	}
+	offset += 4
+
+	if chunk.PayLen > 0 {
+		chunk.Reader = io.LimitReader(r.reader, int64(chunk.PayLen))
+		offset += int64(chunk.PayLen)
+	} else {
+		chunk.Reader = bytes.NewReader(nil)
+	}
+
+	r.offset += offset
+
+	return chunk, nil
 }
 
-func validateChunkType(p byte) int {
+func validateChunkType(p ChunkType) ChunkType {
 	switch p {
-	case chunkTypePayload:
-		return ChunkTypePayload
-	case chunkTypeEOF:
-		return ChunkTypeEOF
+	case ChunkTypePayload:
+		fallthrough
+	case ChunkTypeEOF:
+		return p
 	default:
 		return ChunkTypeUnknown
 	}

@@ -2,14 +2,12 @@ package xbstream
 
 import "encoding/binary"
 
-func int4store(int int) []byte {
-	enc := make([]byte, 4)
-	binary.LittleEndian.PutUint32(enc, uint32(int))
+func int8store(int uint64) []byte {
+	enc := make([]byte, 8)
+	binary.LittleEndian.PutUint64(enc, int)
 	return enc
 }
 
-func int8store(int int) []byte {
-	enc := make([]byte, 8)
-	binary.LittleEndian.PutUint64(enc, uint64(int))
-	return enc
+func uint8korr(p []byte) uint64 {
+	return binary.LittleEndian.Uint64(p[:8])
 }
