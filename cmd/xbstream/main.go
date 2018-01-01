@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/binary"
 	"github.com/akamensky/argparse"
 	"github.com/skmcgrail/go-xbstream/xbstream"
+	"hash/crc32"
 	"io"
 	"log"
 	"os"
@@ -89,8 +91,17 @@ func readStream(file *os.File, output string) {
 			files[fPath] = f
 		}
 
+		crc32Hash := crc32.NewIEEE()
+
+		tReader := io.TeeReader(chunk, crc32Hash)
+
 		f.Seek(int64(chunk.PayOffset), io.SeekStart)
-		if _, err = io.Copy(f, chunk); err != nil {
+		if _, err = io.Copy(f, tReader); err != nil {
+			log.Fatal(err)
+			break
+		}
+
+		if chunk.Checksum != binary.BigEndian.Uint32(crc32Hash.Sum(nil)) {
 			log.Fatal(err)
 			break
 		}
