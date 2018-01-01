@@ -71,11 +71,9 @@ func (r *Reader) Next() (*Chunk, error) {
 		return chunk, nil
 	}
 
-	payLen := make([]byte, 8)
-	if _, err := r.reader.Read(payLen); err != nil {
+	if binary.Read(r.reader, binary.LittleEndian, &chunk.PayLen); err != nil {
 		return nil, StreamReadError
 	}
-	chunk.PayLen = uint8korr(payLen)
 	offset += 8
 
 	if err = binary.Read(r.reader, binary.LittleEndian, &chunk.PayOffset); err != nil {

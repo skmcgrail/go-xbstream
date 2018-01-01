@@ -98,7 +98,7 @@ func (f *File) writeChunk(p []byte) error {
 
 	// Payload Length
 	chunk.PayLen = uint64(len(p))
-	if _, err = buffer.Write(int8store(chunk.PayLen)); err != nil {
+	if err = binary.Write(buffer, binary.LittleEndian, &chunk.PayLen); err != nil {
 		return err
 	}
 
@@ -110,7 +110,7 @@ func (f *File) writeChunk(p []byte) error {
 
 	// Payload Offset
 	chunk.PayOffset = uint64(f.offset)
-	if _, err = buffer.Write(int8store(chunk.PayOffset)); err != nil {
+	if err = binary.Write(buffer, binary.LittleEndian, &chunk.PayOffset); err != nil {
 		return err
 	}
 
