@@ -9,7 +9,6 @@ import (
 
 type Reader struct {
 	reader io.Reader
-	offset int64
 }
 
 func NewReader(reader io.Reader) *Reader {
@@ -33,13 +32,10 @@ func (r *Reader) Next() (*Chunk, error) {
 		return nil, errors.New("wrong chunk magic")
 	}
 
-	offset := int64(8)
-
 	// Chunk Flags
 	if err = binary.Read(r.reader, binary.LittleEndian, &chunk.Flags); err != nil {
 		return nil, StreamReadError
 	}
-	offset++
 
 	// Chunk Type
 	if err = binary.Read(r.reader, binary.LittleEndian, &chunk.Type); err != nil {
@@ -50,13 +46,11 @@ func (r *Reader) Next() (*Chunk, error) {
 			return nil, errors.New("unknown chunk type")
 		}
 	}
-	offset++
 
 	// Path Length
 	if err = binary.Read(r.reader, binary.LittleEndian, &chunk.PathLen); err != nil {
 		return nil, StreamReadError
 	}
-	offset += 4
 
 	// Path
 	if chunk.PathLen > 0 {
@@ -64,7 +58,6 @@ func (r *Reader) Next() (*Chunk, error) {
 		if err = binary.Read(r.reader, binary.BigEndian, &chunk.Path); err != nil {
 			return nil, StreamReadError
 		}
-		offset += int64(chunk.PathLen)
 	}
 
 	if chunk.Type == ChunkTypeEOF {
@@ -74,26 +67,20 @@ func (r *Reader) Next() (*Chunk, error) {
 	if binary.Read(r.reader, binary.LittleEndian, &chunk.PayLen); err != nil {
 		return nil, StreamReadError
 	}
-	offset += 8
 
 	if err = binary.Read(r.reader, binary.LittleEndian, &chunk.PayOffset); err != nil {
 		return nil, StreamReadError
 	}
-	offset += 8
 
 	if err = binary.Read(r.reader, binary.LittleEndian, &chunk.Checksum); err != nil {
 		return nil, StreamReadError
 	}
-	offset += 4
 
 	if chunk.PayLen > 0 {
 		chunk.Reader = io.LimitReader(r.reader, int64(chunk.PayLen))
-		offset += int64(chunk.PayLen)
 	} else {
 		chunk.Reader = bytes.NewReader(nil)
 	}
-
-	r.offset += offset
 
 	return chunk, nil
 }
