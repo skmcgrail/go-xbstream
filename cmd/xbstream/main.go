@@ -86,11 +86,10 @@ func readStream(file *os.File, output string) {
 	for {
 		chunk, err := r.Next()
 		if err != nil {
+			if err == io.EOF {
+				break
+			}
 			log.Fatal(err)
-			break
-		}
-
-		if chunk.Type == xbstream.ChunkTypeEOF {
 			break
 		}
 
@@ -111,6 +110,11 @@ func readStream(file *os.File, output string) {
 			files[fPath] = f
 		}
 
+		if chunk.Type == xbstream.ChunkTypeEOF {
+			f.Close()
+			continue
+		}
+
 		crc32Hash := crc32.NewIEEE()
 
 		tReader := io.TeeReader(chunk, crc32Hash)
@@ -122,14 +126,7 @@ func readStream(file *os.File, output string) {
 		}
 
 		if chunk.Checksum != binary.BigEndian.Uint32(crc32Hash.Sum(nil)) {
-			log.Fatal(err)
-			break
-		}
-	}
-
-	for _, v := range files {
-		if err = v.Close(); err != nil {
-			log.Fatal(err)
+			log.Fatal("chunk checksum did not match")
 			break
 		}
 	}

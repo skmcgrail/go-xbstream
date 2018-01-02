@@ -34,9 +34,9 @@ const (
 )
 
 const (
-	ChunkTypePayload = ChunkType('P')
-	ChunkTypeEOF     = ChunkType('E')
-	ChunkTypeUnknown = ChunkType(0)
+	ChunkTypePayload = ChunkType('P') // Payload
+	ChunkTypeEOF     = ChunkType('E') // End Of File
+	ChunkTypeUnknown = ChunkType(0)   // Unknown Type
 )
 
 var (
@@ -44,15 +44,17 @@ var (
 	StreamReadError = errors.New("xbstream read error")
 )
 
+// Chunk encapsulates a ChunkHeader and provides a io.Reader interface for reading the payload described by the Header
 type Chunk struct {
 	ChunkHeader
 	io.Reader
 }
 
+// ChunkHeader contains the metadata regarding the payload that immediately follows within the archive
 type ChunkHeader struct {
 	Magic     []uint8
 	Flags     ChunkFlag
-	Type      ChunkType
+	Type      ChunkType // The type of Chunk, Note xbstream archives end with a specific EOF type
 	PathLen   uint32
 	Path      []uint8
 	PayLen    uint64

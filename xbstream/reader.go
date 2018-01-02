@@ -26,14 +26,20 @@ import (
 	"io"
 )
 
+// Reader provides sequential access to chunks from an xbstream. Each chunk returned represents a
+// contiguous set of bytes for a file stored in the xbstream archive. The Next method advances the stream
+// and returns the next chunk in the archive. Each archive then acts as a reader for its contiguous set of bytes
 type Reader struct {
 	reader io.Reader
 }
 
+// NewReader creates a new Reader by wrapping the provided reader
 func NewReader(reader io.Reader) *Reader {
 	return &Reader{reader: reader}
 }
 
+// Next advances the Reader and returns the next Chunk.
+// Note: end of input is represented by a specific Chunk type.
 func (r *Reader) Next() (*Chunk, error) {
 	var (
 		chunk = new(Chunk)
@@ -44,7 +50,12 @@ func (r *Reader) Next() (*Chunk, error) {
 
 	// Chunk Magic
 	if err = binary.Read(r.reader, binary.BigEndian, &chunk.Magic); err != nil {
-		return nil, StreamReadError
+		// We should gracefully bubble up EOF if we attempt to read a new Chunk and hit EOF
+		if err != io.EOF {
+			return nil, StreamReadError
+		} else {
+			return nil, err
+		}
 	}
 
 	if bytes.Compare(chunk.Magic, chunkMagic) != 0 {
@@ -60,7 +71,7 @@ func (r *Reader) Next() (*Chunk, error) {
 	if err = binary.Read(r.reader, binary.LittleEndian, &chunk.Type); err != nil {
 		return nil, StreamReadError
 	}
-	if chunkType := validateChunkType(chunk.Type); chunkType == ChunkTypeUnknown {
+	if chunk.Type = validateChunkType(chunk.Type); chunk.Type == ChunkTypeUnknown {
 		if !(chunk.Flags&FlagChunkIgnorable == 1) {
 			return nil, errors.New("unknown chunk type")
 		}
@@ -96,7 +107,11 @@ func (r *Reader) Next() (*Chunk, error) {
 	}
 
 	if chunk.PayLen > 0 {
-		chunk.Reader = io.LimitReader(r.reader, int64(chunk.PayLen))
+		buffer := bytes.NewBuffer(nil)
+		if _, err := io.CopyN(buffer, r.reader, int64(chunk.PayLen)); err != nil {
+			return nil, StreamReadError
+		}
+		chunk.Reader = buffer
 	} else {
 		chunk.Reader = bytes.NewReader(nil)
 	}

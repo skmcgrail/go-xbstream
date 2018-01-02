@@ -28,11 +28,13 @@ import (
 	"sync"
 )
 
+// Writer provides to create and writer files in parallel to an xbstream archive
 type Writer struct {
 	mutex  sync.Mutex
 	writer io.WriteCloser
 }
 
+// File represents a file that is stored within the archive. Exposes an io.WriteCloser interface
 type File struct {
 	path   []byte
 	writer *Writer
@@ -42,10 +44,12 @@ type File struct {
 	offset int // current file offset
 }
 
+// NewWriter returns a new archiver Writer
 func NewWriter(writer io.WriteCloser) *Writer {
 	return &Writer{sync.Mutex{}, writer}
 }
 
+// Create a new File within the archive represent by path
 func (w *Writer) Create(path string) (*File, error) {
 	if len(path) > MaxPathLength {
 		return nil, errors.New("max path length exceeded")
@@ -59,10 +63,14 @@ func (w *Writer) Create(path string) (*File, error) {
 	}, nil
 }
 
+// Close the underlying Writer
 func (w *Writer) Close() error {
 	return w.writer.Close()
 }
 
+// Writes len(p) to the archive, if len(p) < the remaining buffer size the write will be buffered
+// for a later flush. Otherwise contents within the existing buffer will be flushed
+// and then the contents of p will be written
 func (f *File) Write(p []byte) (int, error) {
 	if len(p) < f.free {
 		n := copy(f.chunk[f.pos:], p)
@@ -82,7 +90,7 @@ func (f *File) Write(p []byte) (int, error) {
 func (f *File) writeChunk(p []byte) error {
 	var err error
 	buffer := new(bytes.Buffer)
-	chunk := new(Chunk)
+	chunk := new(ChunkHeader)
 
 	// Chunk Magic
 	chunk.Magic = make([]uint8, len(chunkMagic))
@@ -197,6 +205,7 @@ func (f *File) writeEOF() error {
 	return nil
 }
 
+// Flushes the current contents in the buffer into the archive
 func (f *File) Flush() error {
 	if f.pos == 0 {
 		return nil
@@ -212,6 +221,7 @@ func (f *File) Flush() error {
 	return nil
 }
 
+// Flushes the current file contents and closes the file by writing the EOF chunk to the archive
 func (f *File) Close() error {
 	if err := f.Flush(); err != nil {
 		return err
