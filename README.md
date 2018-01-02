@@ -1,5 +1,7 @@
 # go-xbstream
-**This project is currently work in progress**
+[![GoDoc](https://godoc.org/github.com/skmcgrail/go-xbstream/xbstream?status.svg)](https://godoc.org/github.com/skmcgrail/go-xbstream/xbstream)
+
+**This project is still work in progress, though at this time is functional**
 
 Package xbstream provides an Reader and Writer implementation of the [xbstream][0] format.
 
