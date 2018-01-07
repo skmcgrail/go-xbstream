@@ -52,10 +52,10 @@ func (r *Reader) Next() (*Chunk, error) {
 	if err = binary.Read(r.reader, binary.BigEndian, &chunk.Magic); err != nil {
 		// We should gracefully bubble up EOF if we attempt to read a new Chunk and hit EOF
 		if err != io.EOF {
-			return nil, StreamReadError
-		} else {
-			return nil, err
+			return nil, ErrStreamRead
 		}
+
+		return nil, err
 	}
 
 	if bytes.Compare(chunk.Magic, chunkMagic) != 0 {
@@ -64,12 +64,12 @@ func (r *Reader) Next() (*Chunk, error) {
 
 	// Chunk Flags
 	if err = binary.Read(r.reader, binary.LittleEndian, &chunk.Flags); err != nil {
-		return nil, StreamReadError
+		return nil, ErrStreamRead
 	}
 
 	// Chunk Type
 	if err = binary.Read(r.reader, binary.LittleEndian, &chunk.Type); err != nil {
-		return nil, StreamReadError
+		return nil, ErrStreamRead
 	}
 	if chunk.Type = validateChunkType(chunk.Type); chunk.Type == ChunkTypeUnknown {
 		if !(chunk.Flags&FlagChunkIgnorable == 1) {
@@ -79,14 +79,14 @@ func (r *Reader) Next() (*Chunk, error) {
 
 	// Path Length
 	if err = binary.Read(r.reader, binary.LittleEndian, &chunk.PathLen); err != nil {
-		return nil, StreamReadError
+		return nil, ErrStreamRead
 	}
 
 	// Path
 	if chunk.PathLen > 0 {
 		chunk.Path = make([]uint8, chunk.PathLen)
 		if err = binary.Read(r.reader, binary.BigEndian, &chunk.Path); err != nil {
-			return nil, StreamReadError
+			return nil, ErrStreamRead
 		}
 	}
 
@@ -95,21 +95,21 @@ func (r *Reader) Next() (*Chunk, error) {
 	}
 
 	if binary.Read(r.reader, binary.LittleEndian, &chunk.PayLen); err != nil {
-		return nil, StreamReadError
+		return nil, ErrStreamRead
 	}
 
 	if err = binary.Read(r.reader, binary.LittleEndian, &chunk.PayOffset); err != nil {
-		return nil, StreamReadError
+		return nil, ErrStreamRead
 	}
 
 	if err = binary.Read(r.reader, binary.LittleEndian, &chunk.Checksum); err != nil {
-		return nil, StreamReadError
+		return nil, ErrStreamRead
 	}
 
 	if chunk.PayLen > 0 {
 		buffer := bytes.NewBuffer(nil)
 		if _, err := io.CopyN(buffer, r.reader, int64(chunk.PayLen)); err != nil {
-			return nil, StreamReadError
+			return nil, ErrStreamRead
 		}
 		chunk.Reader = buffer
 	} else {

@@ -98,8 +98,8 @@ func readStream(file *os.File, output string) {
 		if f, ok = files[fPath]; !ok {
 			newFPath := filepath.Join(output, fPath)
 			if err = os.MkdirAll(filepath.Dir(newFPath), 0777); err != nil {
-				break
 				log.Fatal(err)
+				break
 			}
 
 			f, err = os.OpenFile(newFPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
@@ -173,7 +173,7 @@ func writeStream(file *os.File, input *[]string) {
 					log.Fatal(err)
 				}
 			} else {
-				log.Printf("unable to open file %s", file)
+				log.Printf("unable to open file %s", file.Name())
 			}
 		}(f)
 	}

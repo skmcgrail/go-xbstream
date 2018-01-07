@@ -205,7 +205,7 @@ func (f *File) writeEOF() error {
 	return nil
 }
 
-// Flushes the current contents in the buffer into the archive
+// Flush the current contents in the buffer into the archive
 func (f *File) Flush() error {
 	if f.pos == 0 {
 		return nil
@@ -221,15 +221,11 @@ func (f *File) Flush() error {
 	return nil
 }
 
-// Flushes the current file contents and closes the file by writing the EOF chunk to the archive
+// Close flushes any buffered content and closes the file by writing the EOF chunk to the archive
 func (f *File) Close() error {
 	if err := f.Flush(); err != nil {
 		return err
 	}
 
-	if err := f.writeEOF(); err != nil {
-		return err
-	}
-
-	return nil
+	return f.writeEOF()
 }
