@@ -50,7 +50,7 @@ const (
 
 var (
 	chunkMagic = []uint8("XBSTCK01")
-	// ErrStreamRead indicates an error occured while parsing an xbstream
+	// ErrStreamRead indicates an error occurred while parsing an xbstream
 	ErrStreamRead = errors.New("xbstream read error")
 )
 
