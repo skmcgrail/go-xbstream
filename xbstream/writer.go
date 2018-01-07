@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2017 Sean McGrail
- * Copyright (c) 2011-2017 Percona LLC and/or its affiliates.
+ * Copyright (C) 2011-2017 Percona LLC and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -147,7 +147,7 @@ func (f *File) writeChunk(p []byte) error {
 	}
 
 	if _, err = io.Copy(f.writer.writer, buffer); err != nil {
-		return nil
+		return err
 	}
 
 	if _, err = io.Copy(f.writer.writer, bytes.NewReader(p)); err != nil {
