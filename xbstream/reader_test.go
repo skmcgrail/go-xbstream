@@ -23,6 +23,8 @@ import (
 	"bytes"
 	"testing"
 
+	"io"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -119,4 +121,7 @@ func TestNewReader(t *testing.T) {
 	chunk, err = reader.Next()
 	require.NoError(t, err, "error reading eof chunk for file2 from xbstream")
 	assert.Equal(t, expected, chunk.ChunkHeader)
+
+	_, err = reader.Next()
+	assert.Equal(t, err, io.EOF)
 }
