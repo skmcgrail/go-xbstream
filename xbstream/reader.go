@@ -94,7 +94,7 @@ func (r *Reader) Next() (*Chunk, error) {
 		return chunk, nil
 	}
 
-	if binary.Read(r.reader, binary.LittleEndian, &chunk.PayLen); err != nil {
+	if err = binary.Read(r.reader, binary.LittleEndian, &chunk.PayLen); err != nil {
 		return nil, ErrStreamRead
 	}
 
